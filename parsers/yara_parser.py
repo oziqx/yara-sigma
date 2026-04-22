@@ -7,6 +7,7 @@ Pipeline:
   4. Return list of enriched rule dicts ready for JSON output
 """
 
+import hashlib
 import logging
 import re
 from datetime import datetime, timezone
@@ -141,6 +142,7 @@ def extract_yara_rules(file_path: Path, source_info: dict) -> list[dict]:
 
         results.append(
             {
+                "id": hashlib.sha256(raw.encode()).hexdigest(),
                 "type": "yara",
                 "rule_name": rule_name,
                 "source": source_info,

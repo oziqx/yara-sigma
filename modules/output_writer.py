@@ -31,8 +31,8 @@ def save_rule(rule: dict, repo_name: str, rel_file_path: str) -> Path | None:
 
     Returns the path written, or None on failure.
     """
-    kind = rule["type"]  # "yara" or "sigma"
-    rule_name = rule.get("rule_name", "unknown")
+    kind = rule.get("rule-type") or rule.get("type", "unknown")
+    rule_name = rule.get("rule-name") or rule.get("rule_name", "unknown")
 
     rel = Path(rel_file_path)
     dst = (
@@ -52,6 +52,15 @@ def save_rule(rule: dict, repo_name: str, rel_file_path: str) -> Path | None:
     except Exception as exc:
         logger.warning("Failed to write %s: %s", dst, exc)
         return None
+
+
+def remove_repo_output(repo_name: str):
+    """Remove all output JSONs for a repo that no longer exists in REPOS."""
+    for kind in ("yara", "sigma"):
+        target = OUTPUT_DIR / kind / repo_name
+        if target.exists() and target.is_dir():
+            shutil.rmtree(target)
+            logger.info("Removed output for deleted repo: %s", repo_name)
 
 
 def remove_rules_for_file(repo_name: str, rel_file_path: str):

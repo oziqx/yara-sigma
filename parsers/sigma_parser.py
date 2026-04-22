@@ -8,6 +8,7 @@ Pipeline:
   5. Return list of enriched rule dicts ready for JSON output
 """
 
+import hashlib
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -109,6 +110,7 @@ def extract_sigma_rules(file_path: Path, source_info: dict) -> list[dict]:
 
         results.append(
             {
+                "id": hashlib.sha256(raw.encode()).hexdigest(),
                 "type": "sigma",
                 "rule_name": title,
                 "source": source_info,
