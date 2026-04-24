@@ -96,7 +96,7 @@ def process_file(
         rules = extract_sigma_rules(full_path, source_info)
 
     for rule in rules:
-        raw_hash = hashlib.sha256(rule.get("raw", "").encode()).hexdigest()
+        raw_hash = hashlib.sha256(f"{repo_name}/{rule.get('raw', '')}".encode()).hexdigest()
         with hash_lock:
             if raw_hash in seen_hashes:
                 logger.debug("Duplicate rule skipped: %s", rule.get("rule_name"))

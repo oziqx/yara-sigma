@@ -20,19 +20,18 @@ _client = None
 INDEX_MAPPING = {
     "mappings": {
         "properties": {
-            "rule-type":      {"type": "keyword"},
-            "rule-name":      {"type": "keyword"},
-            "rule-id":        {"type": "keyword"},
-            "description":    {"type": "text"},
-            "author":         {"type": "keyword"},
-            "tags":           {"type": "keyword"},
-            "severity":       {"type": "keyword"},
-            "status":         {"type": "keyword"},
-            "repo":           {"type": "keyword"},
-            "file_path":      {"type": "keyword"},
-            "filename":       {"type": "keyword"},
-            "raw":            {"type": "text", "index": False},
-            "ingested_at":    {"type": "date"},
+            "id":                      {"type": "keyword"},
+            "rule-type":               {"type": "keyword"},
+            "rule-name":               {"type": "keyword"},
+            "rule-source":             {"type": "keyword"},
+            "file-path":               {"type": "keyword"},
+            "rule":                    {"type": "text", "index": False},
+            "description":             {"type": "text"},
+            "author":                  {"type": "keyword"},
+            "tags":                    {"type": "keyword"},
+            "references":              {"type": "keyword"},
+            "associated-threat-actor": {"type": "keyword"},
+            "timestamp":               {"type": "date"},
         }
     },
     "settings": {
@@ -97,12 +96,10 @@ def ensure_index() -> bool:
 
 
 def _rule_id(rule: dict) -> str:
-    """Stable document ID: sha256 of raw content, or rule-name+repo fallback."""
-    raw = rule.get("raw", "")
-    if raw:
-        return hashlib.sha256(raw.encode()).hexdigest()
-    key = f"{rule.get('repo','')}/{rule.get('rule-name','unknown')}"
-    return hashlib.sha256(key.encode()).hexdigest()
+    """Stable document ID: sha256 of rule-source+rule content so each repo gets its own doc."""
+    repo = rule.get("rule-source", "")
+    content = rule.get("rule", "") or rule.get("rule-name", "unknown")
+    return hashlib.sha256(f"{repo}/{content}".encode()).hexdigest()
 
 
 def bulk_index_rules(rules: list[dict]) -> int:
@@ -145,8 +142,8 @@ def bulk_delete_by_file(repo_name: str, rel_file_path: str) -> int:
                 "query": {
                     "bool": {
                         "must": [
-                            {"term": {"repo": repo_name}},
-                            {"term": {"file_path": rel_file_path.replace("\\", "/")}},
+                            {"term": {"rule-source": repo_name}},
+                            {"term": {"file-path": rel_file_path.replace("\\", "/")}},
                         ]
                     }
                 }
