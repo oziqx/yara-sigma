@@ -4,7 +4,8 @@
       "Bash(pip show *)",
       "Bash(pip3 show *)",
       "Bash(python3 *)",
-      "Bash(shuf)"
+      "Bash(shuf)",
+      "Bash(xargs -I{} python3 -c \"import json,sys; d=json.load\\(open\\('{}'\\)\\);print\\('FILE:','{}'\\); print\\('tags:', d.get\\('tags','NO TAGS'\\)\\); print\\(\\)\")"
     ]
   }
 }

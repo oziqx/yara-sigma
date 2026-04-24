@@ -10,17 +10,17 @@ def _get_yara_metadata(parsed: dict) -> dict:
     return meta
 
 
-def _to_tag_list(value) -> list[dict]:
-    """Convert any tag format to [{"value": "..."}, ...] for Elasticsearch."""
+def _to_tag_list(value) -> list[str]:
+    """Convert any tag format to a flat list of strings."""
     if not value or value == "-":
-        return [{"value": "-"}]
+        return []
     if isinstance(value, list):
-        tags = [str(t).strip() for t in value if str(t).strip()]
+        tags = [str(t).strip() for t in value if str(t).strip() and str(t).strip() != "-"]
     elif isinstance(value, str):
-        tags = [t.strip() for t in value.replace(",", " ").split() if t.strip()]
+        tags = [t.strip() for t in value.replace(",", " ").split() if t.strip() and t.strip() != "-"]
     else:
         tags = [str(value).strip()]
-    return [{"value": t} for t in tags] if tags else [{"value": "-"}]
+    return tags if tags else []
 
 
 def _str(value, default="-") -> str:
@@ -60,7 +60,7 @@ def _normalize_yara(rule: dict) -> dict:
         "description": description,
         "tags": _to_tag_list(raw_tags),
         "references": reference,
-        "associated-threat-actor": _to_tag_list(threat_actor if threat_actor != "-" else None),
+        "associated-threat-actor": _to_tag_list(threat_actor if threat_actor != "-" else None) or None,
         "timestamp": rule.get("extracted_at", "-"),
     }
 
@@ -94,7 +94,7 @@ def _normalize_sigma(rule: dict) -> dict:
         "description": description,
         "tags": _to_tag_list(raw_tags),
         "references": reference,
-        "associated-threat-actor": _to_tag_list(threat_actor if threat_actor != "-" else None),
+        "associated-threat-actor": _to_tag_list(threat_actor if threat_actor != "-" else None) or None,
         "timestamp": rule.get("extracted_at", "-"),
     }
 

@@ -37,6 +37,7 @@ from modules.output_writer import (
 from parsers.sigma_parser import extract_sigma_rules
 from parsers.yara_parser import extract_yara_rules
 from modules.state_manager import load_state, save_state
+from modules import elastic_writer
 
 LOG_DIR = Path(__file__).resolve().parent / "logs"
 LOG_DIR.mkdir(exist_ok=True)
@@ -67,17 +68,21 @@ def process_file(
     rel_path: str,
     seen_hashes: set,
     hash_lock: threading.Lock,
-) -> dict[str, int]:
-    """Parse a single source file and write one JSON per extracted rule."""
+) -> tuple[dict[str, int], list[dict]]:
+    """Parse a single source file and write one JSON per extracted rule.
+
+    Returns (stats, normalized_rules) so the caller can bulk-index to ES.
+    """
     stats: dict[str, int] = {"yara": 0, "sigma": 0}
+    collected: list[dict] = []
     full_path = repo_root / rel_path
 
     if not full_path.exists():
-        return stats
+        return stats, collected
 
     kind = classify_file(rel_path, repo_type)
     if kind is None:
-        return stats
+        return stats, collected
 
     source_info = {
         "repo": repo_name,
@@ -101,8 +106,9 @@ def process_file(
         normalized = normalize_rule(rule)
         if save_rule(normalized, repo_name, rel_path):
             stats[normalized["rule-type"]] += 1
+            collected.append(normalized)
 
-    return stats
+    return stats, collected
 
 
 def process_repo(
@@ -148,16 +154,23 @@ def process_repo(
 
     totals: dict[str, int] = {"yara": 0, "sigma": 0}
     processed_files = 0
+    es_batch: list[dict] = []
 
     for rel in rule_files:
-        st = process_file(dest, name, rtype, rel, seen_hashes, hash_lock)
+        st, rules = process_file(dest, name, rtype, rel, seen_hashes, hash_lock)
         totals["yara"] += st["yara"]
         totals["sigma"] += st["sigma"]
         if st["yara"] or st["sigma"]:
             processed_files += 1
+        es_batch.extend(rules)
 
     for rel in deleted:
         remove_rules_for_file(name, rel)
+        elastic_writer.bulk_delete_by_file(name, rel)
+
+    if es_batch:
+        indexed = elastic_writer.bulk_index_rules(es_batch)
+        logger.info("[%s] ES: indexed %d rules", name, indexed)
 
     logger.info(
         "[%s] %d files -> %d YARA rules, %d Sigma rules",
@@ -177,6 +190,11 @@ def process_repo(
 
 def main():
     GITHUB_DIR.mkdir(parents=True, exist_ok=True)
+
+    if elastic_writer.connect():
+        elastic_writer.ensure_index()
+    else:
+        logger.warning("Running without Elasticsearch — rules will only be saved locally.")
 
     state = load_state()
 

@@ -8,7 +8,7 @@ from .config import STATE_FILE
 
 logger = logging.getLogger(__name__)
 
-CURRENT_FORMAT_VERSION = 2
+CURRENT_FORMAT_VERSION = 3
 
 
 def load_state() -> dict:
